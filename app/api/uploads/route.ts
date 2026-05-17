@@ -1,35 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerEnv } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
-
-async function triggerExport(
-  supabaseUrl: string,
-  serviceRoleKey: string,
-  payload: {
-    job_id: string;
-    upload_id: string;
-    storage_bucket: string;
-    storage_path: string;
-    original_file_name: string;
-  }
-) {
-  try {
-    await fetch(`${supabaseUrl}/functions/v1/trigger-export`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${serviceRoleKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-  } catch {
-    // Fire-and-forget: export trigger failure must not block the upload response.
-  }
-}
+import { parsePpFile } from "@/lib/pp-reader";
+import type { PpExportData } from "@/lib/pp-reader";
 
 export const runtime = "nodejs";
+export const maxDuration = 300; // Vercel Fluid — keep alive for background export
 
 const metadataSchema = z.object({
   customerName: z.string().trim().min(1).max(200),
@@ -112,15 +91,87 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: jobError.message }, { status: 500 });
   }
 
-  // Dispatch the GitHub Actions cloud workflow via the Supabase Edge Function.
-  // Runs fire-and-forget so a transient dispatch failure never blocks the upload.
-  void triggerExport(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-    job_id: jobData.id,
-    upload_id: uploadId,
-    storage_bucket: env.SUPABASE_UPLOAD_BUCKET,
-    storage_path: storagePath,
-    original_file_name: file.name
+  // Run the .pp parse + BI write after sending the redirect response.
+  // next/server after() keeps the serverless function alive until done.
+  const jobId = jobData.id;
+  const bucket = env.SUPABASE_UPLOAD_BUCKET;
+
+  after(async () => {
+    const sb = createSupabaseAdminClient();
+    try {
+      await sb.from("import_jobs")
+        .update({
+          status: "processing",
+          locked_at: new Date().toISOString(),
+          started_at: new Date().toISOString(),
+          worker_name: "pp-reader-cloud",
+        })
+        .eq("id", jobId)
+        .eq("status", "pending");
+
+      const { data: signData } = await sb.storage.from(bucket).createSignedUrl(storagePath, 600);
+      const fileRes = await fetch(signData!.signedUrl);
+      const ppBuffer = Buffer.from(await fileRes.arrayBuffer());
+
+      const exportData = await parsePpFile(ppBuffer);
+      await writeExportData(sb, exportData);
+
+      await sb.from("import_jobs").update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        asta_result: {
+          tables_written: Object.fromEntries(
+            Object.entries(exportData).map(([k, v]) => [k, Array.isArray(v) ? v.length : 0])
+          ),
+        },
+        error_message: null,
+      }).eq("id", jobId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await sb.from("import_jobs").update({
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error_message: message,
+      }).eq("id", jobId);
+      console.error(`[pp-export] Job ${jobId} failed:`, message);
+    }
   });
 
   return NextResponse.redirect(new URL(`/uploads/success?id=${uploadId}`, request.url), { status: 303 });
+}
+
+// ── BI write helpers ──────────────────────────────────────────────────────────
+
+type AnyRow = Record<string, unknown>;
+
+function serRow(row: AnyRow): AnyRow {
+  const out: AnyRow = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[k] = v instanceof Date ? v.toISOString() : v;
+  }
+  return out;
+}
+
+async function upsertChunked(sb: SupabaseClient, table: string, rows: AnyRow[]) {
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await sb.from(table).upsert(rows.slice(i, i + 500).map(serRow));
+    if (error) throw new Error(`${table}: ${error.message}`);
+  }
+}
+
+export async function writeExportData(sb: SupabaseClient, d: PpExportData) {
+  await upsertChunked(sb, "PlanningData", d.planningData as AnyRow[]);
+  await upsertChunked(sb, "Project", d.projects as AnyRow[]);
+  await upsertChunked(sb, "ProgressPeriod", d.progressPeriods as AnyRow[]);
+  await upsertChunked(sb, "CodeLibrary", d.codeLibraries as AnyRow[]);
+  await upsertChunked(sb, "CodeLibraryEntry", d.codeLibraryEntries as AnyRow[]);
+  await upsertChunked(sb, "Expanded", d.expanded as AnyRow[]);
+  await upsertChunked(sb, "Bar", d.bars as AnyRow[]);
+  await upsertChunked(sb, "Milestone", d.milestones as AnyRow[]);
+  await upsertChunked(sb, "TaskCompletedSection", d.taskCompletedSections as AnyRow[]);
+  await upsertChunked(sb, "Task", d.tasks as AnyRow[]);
+  await upsertChunked(sb, "AllAssignedCodes", d.allAssignedCodes as AnyRow[]);
+  await upsertChunked(sb, "Bsln", d.bsln as AnyRow[]);
+  await upsertChunked(sb, "Link", d.links as AnyRow[]);
+  await upsertChunked(sb, "AllocationTimephased", d.allocationTimephased as AnyRow[]);
 }
