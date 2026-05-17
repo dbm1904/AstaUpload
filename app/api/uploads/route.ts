@@ -4,6 +4,31 @@ import { z } from "zod";
 import { getServerEnv } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 
+async function triggerExport(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  payload: {
+    job_id: string;
+    upload_id: string;
+    storage_bucket: string;
+    storage_path: string;
+    original_file_name: string;
+  }
+) {
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/trigger-export`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    // Fire-and-forget: export trigger failure must not block the upload response.
+  }
+}
+
 export const runtime = "nodejs";
 
 const metadataSchema = z.object({
@@ -77,14 +102,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
-  const { error: jobError } = await supabase.from("import_jobs").insert({
-    upload_id: uploadId,
-    status: "pending"
-  });
+  const { data: jobData, error: jobError } = await supabase
+    .from("import_jobs")
+    .insert({ upload_id: uploadId, status: "pending" })
+    .select("id")
+    .single();
 
   if (jobError) {
     return NextResponse.json({ error: jobError.message }, { status: 500 });
   }
+
+  // Dispatch the GitHub Actions cloud workflow via the Supabase Edge Function.
+  // Runs fire-and-forget so a transient dispatch failure never blocks the upload.
+  void triggerExport(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    job_id: jobData.id,
+    upload_id: uploadId,
+    storage_bucket: env.SUPABASE_UPLOAD_BUCKET,
+    storage_path: storagePath,
+    original_file_name: file.name
+  });
 
   return NextResponse.redirect(new URL(`/uploads/success?id=${uploadId}`, request.url), { status: 303 });
 }

@@ -28,4 +28,9 @@ button:hover { filter: brightness(.95); }
 .helper { font-size: .9rem; color: var(--muted); }
 ul { margin: 0; padding-left: 1.2rem; color: var(--muted); line-height: 1.75; }
 .status-pill { display: inline-flex; align-items: center; gap: 8px; color: var(--success); background: #e8f6f1; border-radius: 999px; padding: 8px 12px; font-weight: 700; }
+.status-pending { color: #6d6a00; background: #fefce8; }
+.status-processing { color: #0e4f8a; background: #e8f2fe; }
+.status-completed { color: var(--success); background: #e8f6f1; }
+.status-failed { color: #9b1b1b; background: #fde8e8; }
+.error-message { color: #9b1b1b; font-size: .9rem; }
 @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } main { padding: 32px 0; } }
