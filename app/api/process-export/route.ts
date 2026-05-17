@@ -120,45 +120,42 @@ function countRows(d: PpExportData): Record<string, number> {
   };
 }
 
-type AnyRow = Record<string, unknown>;
+type SerializedRow = Record<string, unknown>;
 
-async function upsertBatch(
-  supabase: SupabaseClient,
-  table: string,
-  rows: AnyRow[],
-  chunkSize = 500
-) {
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize);
-    const { error } = await supabase.from(table).upsert(chunk);
-    if (error) throw new Error(`Insert into ${table} failed: ${error.message}`);
-  }
-}
-
-// Converts Date objects to ISO strings so Supabase JSON serialisation is clean.
-function serializeRow(row: AnyRow): AnyRow {
-  const out: AnyRow = {};
+function serializeRow(row: object): SerializedRow {
+  const out: SerializedRow = {};
   for (const [k, v] of Object.entries(row)) {
     out[k] = v instanceof Date ? v.toISOString() : v;
   }
   return out;
 }
 
-async function writeBiData(supabase: SupabaseClient, d: PpExportData) {
-  const ser = (rows: AnyRow[]) => rows.map(serializeRow);
+async function upsertBatch(
+  supabase: SupabaseClient,
+  table: string,
+  rows: object[],
+  chunkSize = 500
+) {
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize).map(serializeRow);
+    const { error } = await supabase.from(table).upsert(chunk);
+    if (error) throw new Error(`Insert into ${table} failed: ${error.message}`);
+  }
+}
 
-  await upsertBatch(supabase, "PlanningData", ser(d.planningData as AnyRow[]));
-  await upsertBatch(supabase, "Project", ser(d.projects as AnyRow[]));
-  await upsertBatch(supabase, "ProgressPeriod", ser(d.progressPeriods as AnyRow[]));
-  await upsertBatch(supabase, "CodeLibrary", ser(d.codeLibraries as AnyRow[]));
-  await upsertBatch(supabase, "CodeLibraryEntry", ser(d.codeLibraryEntries as AnyRow[]));
-  await upsertBatch(supabase, "Expanded", ser(d.expanded as AnyRow[]));
-  await upsertBatch(supabase, "Bar", ser(d.bars as AnyRow[]));
-  await upsertBatch(supabase, "Milestone", ser(d.milestones as AnyRow[]));
-  await upsertBatch(supabase, "TaskCompletedSection", ser(d.taskCompletedSections as AnyRow[]));
-  await upsertBatch(supabase, "Task", ser(d.tasks as AnyRow[]));
-  await upsertBatch(supabase, "AllAssignedCodes", ser(d.allAssignedCodes as AnyRow[]));
-  await upsertBatch(supabase, "Bsln", ser(d.bsln as AnyRow[]));
-  await upsertBatch(supabase, "Link", ser(d.links as AnyRow[]));
-  await upsertBatch(supabase, "AllocationTimephased", ser(d.allocationTimephased as AnyRow[]));
+async function writeBiData(supabase: SupabaseClient, d: PpExportData) {
+  await upsertBatch(supabase, "PlanningData", d.planningData);
+  await upsertBatch(supabase, "Project", d.projects);
+  await upsertBatch(supabase, "ProgressPeriod", d.progressPeriods);
+  await upsertBatch(supabase, "CodeLibrary", d.codeLibraries);
+  await upsertBatch(supabase, "CodeLibraryEntry", d.codeLibraryEntries);
+  await upsertBatch(supabase, "Expanded", d.expanded);
+  await upsertBatch(supabase, "Bar", d.bars);
+  await upsertBatch(supabase, "Milestone", d.milestones);
+  await upsertBatch(supabase, "TaskCompletedSection", d.taskCompletedSections);
+  await upsertBatch(supabase, "Task", d.tasks);
+  await upsertBatch(supabase, "AllAssignedCodes", d.allAssignedCodes);
+  await upsertBatch(supabase, "Bsln", d.bsln);
+  await upsertBatch(supabase, "Link", d.links);
+  await upsertBatch(supabase, "AllocationTimephased", d.allocationTimephased);
 }

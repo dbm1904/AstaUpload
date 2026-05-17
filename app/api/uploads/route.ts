@@ -142,17 +142,17 @@ export async function POST(request: Request) {
 
 // ── BI write helpers ──────────────────────────────────────────────────────────
 
-type AnyRow = Record<string, unknown>;
+type SerializedRow = Record<string, unknown>;
 
-function serRow(row: AnyRow): AnyRow {
-  const out: AnyRow = {};
+function serRow(row: object): SerializedRow {
+  const out: SerializedRow = {};
   for (const [k, v] of Object.entries(row)) {
     out[k] = v instanceof Date ? v.toISOString() : v;
   }
   return out;
 }
 
-async function upsertChunked(sb: SupabaseClient, table: string, rows: AnyRow[]) {
+async function upsertChunked(sb: SupabaseClient, table: string, rows: object[]) {
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await sb.from(table).upsert(rows.slice(i, i + 500).map(serRow));
     if (error) throw new Error(`${table}: ${error.message}`);
@@ -160,18 +160,18 @@ async function upsertChunked(sb: SupabaseClient, table: string, rows: AnyRow[]) 
 }
 
 export async function writeExportData(sb: SupabaseClient, d: PpExportData) {
-  await upsertChunked(sb, "PlanningData", d.planningData as AnyRow[]);
-  await upsertChunked(sb, "Project", d.projects as AnyRow[]);
-  await upsertChunked(sb, "ProgressPeriod", d.progressPeriods as AnyRow[]);
-  await upsertChunked(sb, "CodeLibrary", d.codeLibraries as AnyRow[]);
-  await upsertChunked(sb, "CodeLibraryEntry", d.codeLibraryEntries as AnyRow[]);
-  await upsertChunked(sb, "Expanded", d.expanded as AnyRow[]);
-  await upsertChunked(sb, "Bar", d.bars as AnyRow[]);
-  await upsertChunked(sb, "Milestone", d.milestones as AnyRow[]);
-  await upsertChunked(sb, "TaskCompletedSection", d.taskCompletedSections as AnyRow[]);
-  await upsertChunked(sb, "Task", d.tasks as AnyRow[]);
-  await upsertChunked(sb, "AllAssignedCodes", d.allAssignedCodes as AnyRow[]);
-  await upsertChunked(sb, "Bsln", d.bsln as AnyRow[]);
-  await upsertChunked(sb, "Link", d.links as AnyRow[]);
-  await upsertChunked(sb, "AllocationTimephased", d.allocationTimephased as AnyRow[]);
+  await upsertChunked(sb, "PlanningData", d.planningData);
+  await upsertChunked(sb, "Project", d.projects);
+  await upsertChunked(sb, "ProgressPeriod", d.progressPeriods);
+  await upsertChunked(sb, "CodeLibrary", d.codeLibraries);
+  await upsertChunked(sb, "CodeLibraryEntry", d.codeLibraryEntries);
+  await upsertChunked(sb, "Expanded", d.expanded);
+  await upsertChunked(sb, "Bar", d.bars);
+  await upsertChunked(sb, "Milestone", d.milestones);
+  await upsertChunked(sb, "TaskCompletedSection", d.taskCompletedSections);
+  await upsertChunked(sb, "Task", d.tasks);
+  await upsertChunked(sb, "AllAssignedCodes", d.allAssignedCodes);
+  await upsertChunked(sb, "Bsln", d.bsln);
+  await upsertChunked(sb, "Link", d.links);
+  await upsertChunked(sb, "AllocationTimephased", d.allocationTimephased);
 }
