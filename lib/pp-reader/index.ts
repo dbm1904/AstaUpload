@@ -1,6 +1,3 @@
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import { detectFormat } from "./detect";
 import { readSqlitePpFile } from "./sqlite-reader";
 import { readMdbPpFile } from "./mdb-reader";
@@ -19,14 +16,7 @@ export async function parsePpFile(buffer: Buffer): Promise<PpExportData> {
   const format = detectFormat(buffer);
 
   if (format === "sqlite") {
-    // better-sqlite3 needs a file path — write to a temp file, read, clean up.
-    const tmpFile = path.join(os.tmpdir(), `asta-pp-${crypto.randomUUID()}.db`);
-    try {
-      fs.writeFileSync(tmpFile, buffer);
-      return await readSqlitePpFile(tmpFile);
-    } finally {
-      try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
-    }
+    return readSqlitePpFile(buffer);
   }
 
   if (format === "access") {

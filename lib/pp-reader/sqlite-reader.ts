@@ -1,4 +1,8 @@
-import Database from "better-sqlite3";
+import initSqlJs from "sql.js";
+import type { Database } from "sql.js";
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import {
   MDB_ALIASES,
   BAR_COLS,
@@ -13,50 +17,49 @@ import {
 } from "./schema";
 import type { PpExportData } from "./types";
 
+// ─── sql.js initialisation ───────────────────────────────────────────────────
+
+const _require = createRequire(import.meta.url);
+const _wasmBinary = readFileSync(join(dirname(_require.resolve("sql.js")), "sql-wasm.wasm"));
+
+let _sqlInstance: Awaited<ReturnType<typeof initSqlJs>> | null = null;
+async function getSql() {
+  if (!_sqlInstance) _sqlInstance = await initSqlJs({ wasmBinary: _wasmBinary });
+  return _sqlInstance;
+}
+
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 type Row = Record<string, unknown>;
 
-/** Normalise a raw row so abbreviated MDB column names resolve to canonical ones. */
 function normalise(row: Row): Row {
   const out: Row = {};
-  for (const [k, v] of Object.entries(row)) {
-    out[MDB_ALIASES[k] ?? k] = v;
-  }
+  for (const [k, v] of Object.entries(row)) out[MDB_ALIASES[k] ?? k] = v;
   return out;
 }
 
-/** Get a column value by canonical name, falling back to MDB alias. */
 function col(row: Row, canonical: string): unknown {
   return row[canonical] ?? null;
 }
 
-/** Build a column-name lookup from PRAGMA table_info. */
-function tableColumns(db: Database.Database, table: string): Set<string> {
-  try {
-    const info = db.pragma(`table_info(${table})`) as Array<{ name: string }>;
-    return new Set(info.map((r) => r.name));
-  } catch {
-    return new Set();
-  }
+function listTables(db: Database): string[] {
+  const res = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
+  return res.length ? (res[0].values.map((r) => r[0] as string)) : [];
 }
 
-/** List all tables in the database. */
-function listTables(db: Database.Database): string[] {
-  return (
-    db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>
-  ).map((r) => r.name);
-}
-
-function getRows(db: Database.Database, table: string): Row[] {
-  const tables = listTables(db);
-  if (!tables.includes(table)) return [];
-  return (db.prepare(`SELECT * FROM "${table}"`).all() as Row[]).map(normalise);
+function getRows(db: Database, table: string): Row[] {
+  if (!listTables(db).includes(table)) return [];
+  const res = db.exec(`SELECT * FROM "${table}"`);
+  if (!res.length) return [];
+  const { columns, values } = res[0];
+  return values
+    .map((row) => Object.fromEntries(columns.map((c, i) => [c, row[i]])) as Row)
+    .map(normalise);
 }
 
 // ─── project-level metadata ──────────────────────────────────────────────────
 
-function readProjectSummary(db: Database.Database): {
+function readProjectSummary(db: Database): {
   guid: string;
   version: number;
   baselineId: number;
@@ -71,24 +74,22 @@ function readProjectSummary(db: Database.Database): {
   const rows = getRows(db, "project_summary");
   const ps = rows[0] ?? {};
 
-  // GUID: try common column names
   const guid =
     (col(ps, "UNIQUE_ID") as string) ??
     (col(ps, "GUID") as string) ??
     (col(ps, PROJECT_SUMMARY_COLS.projectGuid) as string) ??
     crypto.randomUUID();
 
-  // Schema version from dodschem
   let version = 0;
   try {
-    const sv = db.prepare('SELECT SCHVER FROM "dodschem"').get() as { SCHVER?: number } | undefined;
-    if (sv?.SCHVER) version = sv.SCHVER;
+    const sv = db.exec('SELECT SCHVER FROM "dodschem"');
+    if (sv.length && sv[0].values.length) version = Number(sv[0].values[0][0]);
   } catch { /* dodschem may not exist in older files */ }
 
   return {
     guid: String(guid),
     version,
-    baselineId: 0, // live plan; baselines are separate rows in baseline_summary
+    baselineId: 0,
     author: col(ps, PROJECT_SUMMARY_COLS.projectBy) as string | null,
     shortName: col(ps, PROJECT_SUMMARY_COLS.shortName) as string | null,
     longName: col(ps, PROJECT_SUMMARY_COLS.longName) as string | null,
@@ -99,36 +100,17 @@ function readProjectSummary(db: Database.Database): {
   };
 }
 
-// ─── build hierarchy maps ────────────────────────────────────────────────────
+// ─── hierarchy helpers ───────────────────────────────────────────────────────
 
-/** Precompute bar→expanded_task and barId→barRow maps. */
 function buildBarMap(bars: Row[]): Map<number, Row> {
   return new Map(bars.map((b) => [Number(col(b, BAR_COLS.id)), b]));
 }
 
-/** Compute a full path string by walking parent references. */
-function computePath(
-  id: number,
-  nameMap: Map<number, string>,
-  parentMap: Map<number, number>,
-  separator = "\\"
-): string {
-  const parts: string[] = [];
-  let current: number | undefined = id;
-  const seen = new Set<number>();
-  while (current !== undefined && current !== null && !seen.has(current)) {
-    seen.add(current);
-    const name = nameMap.get(current);
-    if (name) parts.unshift(name);
-    current = parentMap.get(current);
-  }
-  return parts.join(separator);
-}
-
 // ─── main export function ────────────────────────────────────────────────────
 
-export async function readSqlitePpFile(filePath: string): Promise<PpExportData> {
-  const db = new Database(filePath, { readonly: true });
+export async function readSqlitePpFile(buffer: Buffer): Promise<PpExportData> {
+  const SQL = await getSql();
+  const db = new SQL.Database(buffer);
 
   const runDate = new Date();
   const runNumber = 1;
@@ -137,7 +119,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
   const planningDataVersion = ps.version;
   const baselineId = ps.baselineId;
 
-  // ── project_summary / PlanningData ─────────────────────────────────────
+  // ── PlanningData ────────────────────────────────────────────────────────
   const planningData = [
     {
       RunDate: runDate,
@@ -156,7 +138,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     },
   ];
 
-  // ── progress_period ─────────────────────────────────────────────────────
+  // ── ProgressPeriod ──────────────────────────────────────────────────────
   const ppRows = getRows(db, "progress_period");
   const progressPeriods = ppRows.map((r) => ({
     RunDate: runDate,
@@ -167,11 +149,11 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     ID: Number(col(r, "PROGRESS_PERIODID") ?? col(r, "ID") ?? 0),
     Name: col(r, "NAME") as string | null,
     PathName: col(r, "PATHNAME") as string | null,
-    FullName: col(r, "FULLNAME") ?? col(r, "NAME") as string | null,
+    FullName: (col(r, "FULLNAME") ?? col(r, "NAME")) as string | null,
     Reportdate: parseAstaDate(col(r, "REPORT_DATE")),
   }));
 
-  // ── code_library ────────────────────────────────────────────────────────
+  // ── CodeLibrary ─────────────────────────────────────────────────────────
   const clRows = getRows(db, "code_library");
   const codeLibraries = clRows.map((r) => ({
     RunDate: runDate,
@@ -184,7 +166,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     SingleSelect: col(r, "SINGLESELECT") != null ? Number(col(r, "SINGLESELECT")) : null,
   }));
 
-  // ── code_library_entry ──────────────────────────────────────────────────
+  // ── CodeLibraryEntry ────────────────────────────────────────────────────
   const cleRows = getRows(db, "code_library_entry");
   const codeLibraryEntries = cleRows.map((r) => ({
     RunDate: runDate,
@@ -205,7 +187,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     SortOrder: Number(col(r, "SORT_ORDER") ?? col(r, "SORTORDER") ?? 0),
   }));
 
-  // ── bars ────────────────────────────────────────────────────────────────
+  // ── Bar ─────────────────────────────────────────────────────────────────
   const barRows = getRows(db, "bar");
   const barMap = buildBarMap(barRows);
   const bars = barRows.map((r) => ({
@@ -237,7 +219,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     BaselineLateFinish: null as Date | null,
   }));
 
-  // ── expanded_task → Expanded ─────────────────────────────────────────────
+  // ── Expanded (expanded_task) ─────────────────────────────────────────────
   const etRows = getRows(db, "expanded_task");
   const expanded = etRows.map((r) => {
     const barId = col(r, EXPANDED_TASK_COLS.bar) != null ? Number(col(r, EXPANDED_TASK_COLS.bar)) : null;
@@ -296,7 +278,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     };
   });
 
-  // ── Project rows (expanded tasks with isproject flag) ───────────────────
+  // ── Project ──────────────────────────────────────────────────────────────
   const projects = expanded
     .filter((e) => e.ParentContainer === null || e.ParentContainer === 0)
     .map((e) => ({
@@ -314,7 +296,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
       ProjectFullName: e.PathName ?? e.Name,
     }));
 
-  // ── tasks ────────────────────────────────────────────────────────────────
+  // ── Task ─────────────────────────────────────────────────────────────────
   const taskRows = getRows(db, "task");
   const tasks = taskRows.map((r) => {
     const durationH = parseAstaDurationHours(col(r, TASK_COLS.durationHours));
@@ -378,7 +360,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     };
   });
 
-  // ── milestones ────────────────────────────────────────────────────────────
+  // ── Milestone ────────────────────────────────────────────────────────────
   const msRows = getRows(db, "milestone");
   const milestones = msRows.map((r) => {
     const barId = col(r, MILESTONE_COLS.bar) != null ? Number(col(r, MILESTONE_COLS.bar)) : null;
@@ -440,7 +422,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     };
   });
 
-  // ── task_completed_section ────────────────────────────────────────────────
+  // ── TaskCompletedSection ─────────────────────────────────────────────────
   const tcsRows = getRows(db, "task_completed_section");
   const taskCompletedSections = tcsRows.map((r) => ({
     RunDate: runDate,
@@ -457,7 +439,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     OPC: col(r, "OVERALL_PERCENT_COMPLETE") != null ? Number(col(r, "OVERALL_PERCENT_COMPLETE")) : null,
   }));
 
-  // ── links ─────────────────────────────────────────────────────────────────
+  // ── Link ─────────────────────────────────────────────────────────────────
   const linkRows = getRows(db, "link");
   const links = linkRows.map((r) => {
     const startLagH = parseAstaDurationHours(col(r, LINK_COLS.startLagHours) ?? col(r, "START_LAG_TIME"));
@@ -495,7 +477,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     };
   });
 
-  // ── baseline_summary → Bsln ──────────────────────────────────────────────
+  // ── Bsln (baseline_summary) ──────────────────────────────────────────────
   const bslnRows = getRows(db, "baseline_summary");
   const bsln = bslnRows.map((r) => ({
     RunDate: runDate,
@@ -512,7 +494,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     LastEditedDate: parseAstaDate(col(r, "UPDATE_DATE") ?? col(r, "LAST_EDITED_DATE")),
   }));
 
-  // ── code_library_assignabl_codes → AllAssignedCodes ─────────────────────
+  // ── AllAssignedCodes ─────────────────────────────────────────────────────
   const codesRows = getRows(db, "code_library_assignabl_codes");
   const allAssignedCodes = codesRows.map((r) => ({
     RunDate: runDate,
@@ -524,7 +506,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     ObjectType: col(r, "OBJECT_TYPE") as string | null,
   }));
 
-  // ── permanent_schedul_allocation → AllocationTimephased ─────────────────
+  // ── AllocationTimephased ─────────────────────────────────────────────────
   const allocRows = getRows(db, "permanent_schedul_allocation");
   const allocationTimephased = allocRows.map((r) => ({
     RunDate: runDate,
@@ -556,7 +538,7 @@ export async function readSqlitePpFile(filePath: string): Promise<PpExportData> 
     bars,
     milestones,
     taskCompletedSections,
-    taskDurationSlices: [], // computed from task timephased data; left empty for now
+    taskDurationSlices: [],
     tasks,
     allAssignedCodes,
     bsln,
