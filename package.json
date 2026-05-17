@@ -11,9 +11,12 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "latest",
+    "@types/sql.js": "^1.4.11",
+    "mdb-reader": "^3.2.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "sql.js": "^1.14.1",
     "zod": "latest"
   },
   "devDependencies": {

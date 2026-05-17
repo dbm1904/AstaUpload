@@ -1,0 +1,187 @@
+name: Asta BI Export
+
+# Triggered automatically via repository_dispatch from the Supabase Edge Function
+# when a new import job is created.  Can also be dispatched manually for reruns.
+on:
+  repository_dispatch:
+    types: [asta-bi-export]
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "import_jobs UUID"
+        required: true
+      upload_id:
+        description: "project_uploads UUID"
+        required: true
+      storage_bucket:
+        description: "Supabase Storage bucket name"
+        required: true
+        default: "asta-powerproject-uploads"
+      storage_path:
+        description: "Path within the bucket (uuid/filename.pp)"
+        required: true
+      original_file_name:
+        description: "Original .pp file name"
+        required: true
+
+jobs:
+  export:
+    name: Export BI data from .pp file
+    # Requires a self-hosted Windows runner with the Asta Developers' Toolkit
+    # installed.  Register the runner with labels: self-hosted, windows, asta
+    runs-on: [self-hosted, windows, asta]
+    timeout-minutes: 60
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Normalise parameters regardless of trigger type
+      # -----------------------------------------------------------------------
+      - name: Resolve job parameters
+        id: p
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'repository_dispatch') {
+            Add-Content $env:GITHUB_OUTPUT "job_id=${{ github.event.client_payload.job_id }}"
+            Add-Content $env:GITHUB_OUTPUT "upload_id=${{ github.event.client_payload.upload_id }}"
+            Add-Content $env:GITHUB_OUTPUT "storage_bucket=${{ github.event.client_payload.storage_bucket }}"
+            Add-Content $env:GITHUB_OUTPUT "storage_path=${{ github.event.client_payload.storage_path }}"
+            Add-Content $env:GITHUB_OUTPUT "original_file_name=${{ github.event.client_payload.original_file_name }}"
+          } else {
+            Add-Content $env:GITHUB_OUTPUT "job_id=${{ inputs.job_id }}"
+            Add-Content $env:GITHUB_OUTPUT "upload_id=${{ inputs.upload_id }}"
+            Add-Content $env:GITHUB_OUTPUT "storage_bucket=${{ inputs.storage_bucket }}"
+            Add-Content $env:GITHUB_OUTPUT "storage_path=${{ inputs.storage_path }}"
+            Add-Content $env:GITHUB_OUTPUT "original_file_name=${{ inputs.original_file_name }}"
+          }
+
+      # -----------------------------------------------------------------------
+      # 2. Download the .pp file from Supabase private Storage via signed URL
+      # -----------------------------------------------------------------------
+      - name: Download .pp file from Supabase Storage
+        id: dl
+        shell: pwsh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          STORAGE_BUCKET: ${{ steps.p.outputs.storage_bucket }}
+          STORAGE_PATH: ${{ steps.p.outputs.storage_path }}
+          UPLOAD_ID: ${{ steps.p.outputs.upload_id }}
+          ORIGINAL_FILE_NAME: ${{ steps.p.outputs.original_file_name }}
+        run: |
+          $headers = @{
+            apikey        = $env:SUPABASE_SERVICE_ROLE_KEY
+            Authorization = "Bearer $env:SUPABASE_SERVICE_ROLE_KEY"
+            'Content-Type' = 'application/json'
+          }
+          # URL-encode each path segment so filenames with spaces/unicode are safe
+          $encodedPath = ($env:STORAGE_PATH -split '/') |
+            ForEach-Object { [uri]::EscapeDataString($_) } |
+            Join-String -Separator '/'
+          $signResp = Invoke-RestMethod -Method Post `
+            -Uri "$env:SUPABASE_URL/storage/v1/object/sign/$env:STORAGE_BUCKET/$encodedPath" `
+            -Headers $headers `
+            -Body '{"expiresIn":600}'
+          $signedUrl = "$env:SUPABASE_URL/storage/v1$($signResp.signedURL)"
+          $safeName  = $env:ORIGINAL_FILE_NAME -replace '[^a-zA-Z0-9._-]', '_'
+          $localPath = Join-Path $env:RUNNER_TEMP "$env:UPLOAD_ID-$safeName"
+          Invoke-WebRequest -Uri $signedUrl -OutFile $localPath
+          Add-Content $env:GITHUB_OUTPUT "local_path=$localPath"
+          Write-Host "Downloaded to $localPath"
+
+      # -----------------------------------------------------------------------
+      # 3. Open the .pp file via Asta COM automation and run PerformBIExport
+      #    This mirrors the existing PowerShell worker (Invoke-AstaImportWorker.ps1)
+      #    and requires the Asta Developers' Toolkit to be installed on the runner.
+      # -----------------------------------------------------------------------
+      - name: Run Asta BI export via COM automation
+        id: export
+        shell: pwsh
+        env:
+          ASTA_BI_ODBC_CONNECTION_STRING: ${{ secrets.ASTA_BI_ODBC_CONNECTION_STRING }}
+          LOCAL_PATH: ${{ steps.dl.outputs.local_path }}
+          ASTA_USER: ${{ vars.ASTA_USER }}
+          ASTA_WIPE: ${{ vars.ASTA_WIPE }}
+        run: |
+          $user  = if ($env:ASTA_USER)  { $env:ASTA_USER  } else { 'Admin' }
+          $wipe  = if ($env:ASTA_WIPE)  { $env:ASTA_WIPE  } else { 'None'  }
+          Write-Host "Opening $env:LOCAL_PATH as user '$user' (wipe=$wipe)..."
+          $app     = New-Object -ComObject Teamplan.Object
+          $project = $app.Projects.OpenLocalProject($env:LOCAL_PATH, $user, '')
+          $params  = @{
+            dataconnectiontype = 'odbc'
+            wipe               = $wipe
+            parallel           = $true
+            connection_string  = $env:ASTA_BI_ODBC_CONNECTION_STRING
+          }
+          $resultStr = $project.PerformBIExport(($params | ConvertTo-Json -Depth 10))
+          $result    = $resultStr | ConvertFrom-Json
+          if ($result.PSObject.Properties.Name -contains 'error') {
+            throw ($result.error -replace ';', [Environment]::NewLine)
+          }
+          $result | ConvertTo-Json -Depth 20 | Set-Content export_result.json -Encoding UTF8
+          Write-Host "BI export completed."
+
+      # -----------------------------------------------------------------------
+      # 4. Write success status back to Supabase
+      # -----------------------------------------------------------------------
+      - name: Mark job completed
+        if: success()
+        shell: pwsh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          JOB_ID: ${{ steps.p.outputs.job_id }}
+        run: |
+          $headers = @{
+            apikey        = $env:SUPABASE_SERVICE_ROLE_KEY
+            Authorization = "Bearer $env:SUPABASE_SERVICE_ROLE_KEY"
+            'Content-Type' = 'application/json'
+          }
+          $result = Get-Content export_result.json -Raw | ConvertFrom-Json
+          $body   = @{ job = $env:JOB_ID; result = $result } | ConvertTo-Json -Depth 20
+          Invoke-RestMethod -Method Post `
+            -Uri "$env:SUPABASE_URL/rest/v1/rpc/complete_import_job" `
+            -Headers $headers -Body $body | Out-Null
+          Write-Host "Job $env:JOB_ID marked completed."
+
+      # -----------------------------------------------------------------------
+      # 5. Write failure status back to Supabase (always runs on step failure)
+      # -----------------------------------------------------------------------
+      - name: Mark job failed
+        if: failure()
+        shell: pwsh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          JOB_ID: ${{ steps.p.outputs.job_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          $headers = @{
+            apikey        = $env:SUPABASE_SERVICE_ROLE_KEY
+            Authorization = "Bearer $env:SUPABASE_SERVICE_ROLE_KEY"
+            'Content-Type' = 'application/json'
+          }
+          $body = @{
+            job     = $env:JOB_ID
+            message = "GitHub Actions run failed. Logs: $env:RUN_URL"
+          } | ConvertTo-Json
+          Invoke-RestMethod -Method Post `
+            -Uri "$env:SUPABASE_URL/rest/v1/rpc/fail_import_job" `
+            -Headers $headers -Body $body | Out-Null
+          Write-Host "Job $env:JOB_ID marked failed."
+
+      # -----------------------------------------------------------------------
+      # 6. Clean up temporary files
+      # -----------------------------------------------------------------------
+      - name: Clean up
+        if: always()
+        shell: pwsh
+        env:
+          LOCAL_PATH: ${{ steps.dl.outputs.local_path }}
+        run: |
+          if ($env:LOCAL_PATH -and (Test-Path $env:LOCAL_PATH)) {
+            Remove-Item $env:LOCAL_PATH -Force -ErrorAction SilentlyContinue
+          }
+          if (Test-Path export_result.json) {
+            Remove-Item export_result.json -Force -ErrorAction SilentlyContinue
+          }
