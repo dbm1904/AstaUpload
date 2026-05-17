@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<Model comment="Custom model for Acumine, revised on 19th September 2025">
+    <Tables>
+        <Table name="PlanningData" apptype="projectsummary">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+		<Column name="Author" datatype="String" group="Location" psfield="projectby"/>
+		<Column name="ShortName" datatype="String" group="Location" psfield="shortname"/>
+		<Column name="LongName" datatype="String" group="Location" psfield="longname"/>
+		<Column name="ShortFileName" datatype="String" group="Location" psfield="shortfilename"/>
+		<Column name="LongFileName" datatype="String" group="Location" psfield="longfilename"/>
+		<Column name="ReportDate" datatype="Datetime" group="Location" psfield="reportdate"/>
+		<Column name="CurrentUserName" datatype="String" group="Location" psfield="currentusername"/>
+		 <Column name="CurrentBaselineID" datatype="Integer" size="0" formula="[~CB].BaselineContext()" required="false" />
+            </Columns>
+        </Table>
+		
+        <Table name="Project" apptype="expandedtask" appfilter="isproject = 'TRUE'">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID" formula="Int(ID)" required="true"/>
+		<Column name="Name" datatype="String" group="ID" formula="Name"/>
+		<Column name="ShortName" datatype="String" group="Location" psfield="shortname"/>
+		<Column name="LongName" datatype="String" group="Location" psfield="longname"/>
+		<Column name="ShortFileName" datatype="String" group="Location" psfield="shortfilename"/>
+		<Column name="LongFileName" datatype="String" group="Location" psfield="longfilename"/>
+		<Column name="ProjectName" datatype="String" group="Location" formula="Project.Name"/>
+		<Column name="ProjectFullName" datatype="String" group="Location" formula="Project.Pathname &amp; &quot;\&quot; &amp; Project.Name"/>
+            </Columns>
+        </Table>
+			
+		 <Table name="ProgressPeriod" apptype="progressperiod">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID"  field="ID"  required="true"/>
+		<Column name="Name" datatype="String" group="ID" field="Name"/>
+		<Column name="PathName" datatype="String" group="ID" field="Pathname"/>
+		<Column name="FullName" datatype="String" group="ID" field="Fullname"/>
+		<Column name="Reportdate" datatype="Datetime" group="Dates" field="reportdate"/>
+            </Columns>
+        </Table>
+		
+		 <Table name="CodeLibrary" apptype="codelibrary">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID"  field="ID"  required="true"/>
+		<Column name="Name" datatype="String" group="ID" field="Name" size="64"/>
+		<Column name="SingleSelect" datatype="Boolean" group="ID" field="singleselect"/>
+            </Columns>
+        </Table>
+		
+        <Table name="CodeLibraryEntry" apptype="codelibraryentry">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID"  field="ID"  required="true"/>
+		<Column name="Name" datatype="String" group="ID" field="Name" size="64"/>
+        	<Column name="Lineage" datatype="String" size="0" field="parents" required="true" />
+        	<Column name="OrderString" datatype="String" size="0" field="orderstring" required="true" />
+        	<Column name="ShortName" datatype="String" size="0" field="Shortname" required="true" />
+        	<Column name="PathName" datatype="String" size="0" field="Pathname" required="true" />
+        	<Column name="FullName" datatype="String" size="0" field="Fullname" required="true" />
+        	<Column name="ParentName" datatype="String" size="0" field="Parentname" required="true" />
+        	<Column name="LibraryName" datatype="String" size="0" field="LibraryName" required="true" />
+		<Column name="LibraryID" datatype="Integer" group="ID" field="CodeLibrary"/>
+        	<Column name="SortOrder" datatype="Integer" size="0" field="sortorder" required="true" />
+            </Columns>
+        </Table>
+       	
+        <Table name="Expanded" apptype="expandedtask">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID" formula="Int(ID)" required="true"/>
+		<Column name="ProjectID" datatype="Integer" group="ID" formula="Int(Project)" required="true"/>
+		<Column name="Name" datatype="String" group="ID" formula="Name"/>
+		<Column name="PathName" datatype="String" group="Identification" formula="PathName"/>
+		<Column name="ParentContainer" datatype="Integer" group="Identification" field="Etask" comment="First ascendant expanded or summary task" />
+		<Column name="Lineage" datatype="String" group="Identification" field="parents"/>
+		<Column name="Type" datatype="Enumerated" group="Identification" formula="Text(Type)" size="20"/>
+		<Column name="TaskOID" datatype="Integer" group="Identification" formula="TaskID"/>
+		<Column name="BarID" datatype="Integer" group="Identification" formula="BarID"/>
+		<Column name="BarNaturalOrder" datatype="Integer" group="Identification" formula="Bar.NaturalOrder"/>
+		<Column name="NaturalOrder" datatype="Integer" group="Identification" formula="NaturalOrder"/>
+		<Column name="UniqueTaskID" datatype="String" group="Identification" formula="UniqueTaskID" size="40"/>
+		<Column name="Notes" datatype="String" group="Identification" formula="Notes" size="2000"/>		
+		<Column name="StartDate" datatype="Datetime" group="Date" formula="Start"/>
+		<Column name="Finish" datatype="Datetime" group="Date" formula="Finish"/>
+		<Column name="DurationDays" datatype="Duration" group="Date" formula="Duration / '1d'"/>
+		<Column name="DurationHours" datatype="Duration" group="Date" formula="Duration / '1h'"/>
+		<Column name="ActualStart" datatype="Datetime" group="Date" formula="ActualStart"/>
+		<Column name="ActualFinish" datatype="Datetime" group="Date" formula="ActualFinish"/>
+		<Column name="BaselineStart" datatype="Datetime" group="Date" formula="[~CB].Start"/>
+		<Column name="BaselineFinish" datatype="Datetime" group="Date" formula="[~CB].Finish"/>
+		<Column name="PercentComplete" datatype="Float" group="Progress" formula="PercentComplete"/>
+		<Column name="CalendarId" datatype="Integer" group="Date" formula="Int(Calendar)"/>
+		<Column name="Calendar" datatype="String" group="Date" formula="Text(Calendar)"/>
+		<Column name="DurationPercentComplete" datatype="Float" group="Progress" formula="DurationPercentComplete"/>
+		<Column name="PlannedPercentComplete" datatype="Float" group="Progress" formula="PlannedPercentComplete(CB, PEP)"  comment="PPC at current progress period in current baseline, or live"/>
+		<Column name="OverallPercentComplete" datatype="Float" group="Progress" formula="OverallPercentComplete"/>
+		<Column name="TotalFloat" datatype="Duration" group="Float" formula="TotalFloat / '1h'"/>
+		<Column name="OriginalDuration" datatype="Duration" group="Float" formula="OriginalDuration / '1h'"/>
+		<Column name="ConstraintFlag" datatype="Enumerated" group="Constraint" formula="Constraint"/>
+		<Column name="Predecessors" datatype="String" group="Logic" formula="Predecessors"/>
+		<Column name="Successors" datatype="String" group="Logic" formula="Successors"/>
+		<Column name="Critical" datatype="Boolean" group="Float" formula="Critical"/>
+		<Column name="NearlyCritical" datatype="Boolean" group="Float" formula="NearlyCritical"/>
+		<Column name="LongestPath" datatype="Boolean" group="Float" formula="LongestPath"/>
+		<Column name="EarlyStart" datatype="Datetime" group="Float" formula="EarlyStart"/>
+		<Column name="EarlyFinish" datatype="Datetime" group="Float" formula="EarlyFinish"/>
+		<Column name="LateStart" datatype="Datetime" group="Float" formula="LateStart"/>
+		<Column name="LateFinish" datatype="Datetime" group="Float" formula="LateFinish"/>
+		<Column name="BaselineEarlyStart" datatype="Datetime" group="Date" formula="[~CB].EarlyStart"/>
+		<Column name="BaselineEarlyFinish" datatype="Datetime" group="Date" formula="[~CB].EarlyFinish"/>
+		<Column name="BaselineLateStart" datatype="Datetime" group="Date" formula="[~CB].LateStart"/>
+		<Column name="BaselineLateFinish" datatype="Datetime" group="Date" formula="[~CB].LateFinish"/>
+		<Column name="BaselineEffort" datatype="Duration" group="Resource" formula="[~CB].Effort / '1h'"/>
+            </Columns>
+        </Table>
+		
+        <Table name="Bar" apptype="bar" appfilter="parents in (37)">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID" formula="Int(ID)" required="true"/>
+		<Column name="ProjectID" datatype="Integer" group="ID" formula="Int(Project)" required="true"/>
+		<Column name="PathName" datatype="String" group="Identification" formula="PathName"/>
+		<Column name="Name" datatype="String" group="ID" formula="Name"/>
+		<Column name="Lineage" datatype="String" group="Identification" field="parents"/>
+		<Column name="ParentName" datatype="String" group="Identification" formula="ParentName"/>
+		<Column name="ParentId" datatype="Integer" group="Identification" field="expandedtask"/>
+		<Column name="BarNaturalOrder" datatype="Integer" group="Identification" formula="Bar.NaturalOrder"/>
+		<Column name="NaturalOrder" datatype="Integer" group="Identification" formula="NaturalOrder"/>
+		<Column name="StartDate" datatype="Datetime" group="Date" formula="Start"/>
+		<Column name="Finish" datatype="Datetime" group="Date" formula="Finish"/>
+		<Column name="ActualStart" datatype="Datetime" group="Date" formula="ActualStart"/>
+		<Column name="ActualFinish" datatype="Datetime" group="Date" formula="ActualFinish"/>
+		<Column name="BaselineStart" datatype="Datetime" group="Date" formula="[~CB].Start"/>
+		<Column name="BaselineFinish" datatype="Datetime" group="Date" formula="[~CB].Finish"/>
+		<Column name="PercentComplete" datatype="Float" group="Progress" formula="PercentComplete"/>
+		<Column name="DurationPercentComplete" datatype="Float" group="Progress" formula="DurationPercentComplete"/>
+		<Column name="BaselineEarlyStart" datatype="Datetime" group="Date" formula="[~CB].EarlyStart"/>
+		<Column name="BaselineEarlyFinish" datatype="Datetime" group="Date" formula="[~CB].EarlyFinish"/>
+		<Column name="BaselineLateStart" datatype="Datetime" group="Date" formula="[~CB].LateStart"/>
+		<Column name="BaselineLateFinish" datatype="Datetime" group="Date" formula="[~CB].LateFinish"/>
+            </Columns>
+        </Table>
+		
+        <Table name="Milestone" apptype="milestone">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID" formula="Int(ID)" required="true"/>
+		<Column name="ProjectID" datatype="Integer" group="ID" formula="Int(Project)" required="true"/>
+		<Column name="PathName" datatype="String" group="Identification" formula="PathName"/>
+		<Column name="ParentContainer" datatype="Integer" group="Identification" field="Etask" comment="First ascendant expanded or summary task" />
+		<Column name="Lineage" datatype="String" group="Identification" field="parents"/>
+		<Column name="Name" datatype="String" group="ID" formula="Name"/>
+		<Column name="Notes" datatype="String" group="Identification" formula="Notes" size="2000"/>
+		<Column name="Type" datatype="Enumerated" group="Identification" formula="Text(Type)" size="20"/>
+		<Column name="TaskOID" datatype="Integer" group="Identification" formula="TaskID"/>
+		<Column name="BarID" datatype="Integer" group="Identification" formula="BarID"/>
+		<Column name="BarNaturalOrder" datatype="Integer" group="Identification" formula="Bar.NaturalOrder"/>
+		<Column name="NaturalOrder" datatype="Integer" group="Identification" formula="NaturalOrder"/>
+		<Column name="UniqueTaskID" datatype="String" group="Identification" formula="UniqueTaskID" size="40"/>
+		<Column name="StartDate" datatype="Datetime" group="Date" formula="Start"/>
+		<Column name="Finish" datatype="Datetime" group="Date" formula="Finish"/>
+		<Column name="DurationHours" datatype="Duration" group="Date" formula="Duration / '1h'"/>
+		<Column name="DurationDays" datatype="Duration" group="Date" formula="Duration / '1d'"/>
+		<Column name="CalendarId" datatype="Integer" group="Date" formula="Int(Calendar)"/>
+		<Column name="Calendar" datatype="String" group="Date" formula="Text(Calendar)"/>
+		<Column name="DurationPercentComplete" datatype="Float" group="Progress" formula="DurationPercentComplete"/>
+		<Column name="ActualStart" datatype="Datetime" group="Date" formula="ActualStart"/>
+		<Column name="ActualFinish" datatype="Datetime" group="Date" formula="ActualFinish"/>
+		<Column name="PercentComplete" datatype="Float" group="Progress" formula="PercentComplete"/>
+		<Column name="BaselineStart" datatype="Datetime" group="Date" formula="[~CB].Start"/>
+		<Column name="BaselineFinish" datatype="Datetime" group="Date" formula="[~CB].Finish"/>
+		<Column name="Critical" datatype="Boolean" group="Float" formula="Critical"/>
+		<Column name="EarlyStart" datatype="Datetime" group="Float" formula="EarlyStart"/>
+		<Column name="EarlyFinish" datatype="Datetime" group="Float" formula="EarlyFinish"/>
+		<Column name="TotalFloat" datatype="Duration" group="Float" formula="TotalFloat / '1h'"/>
+		<Column name="OriginalDuration" datatype="Duration" group="Float" formula="OriginalDuration / '1h'"/>
+		<Column name="LongestPath" datatype="Boolean" group="Float" formula="LongestPath"/>
+		<Column name="NearlyCritical" datatype="Boolean" group="Float" formula="NearlyCritical"/>
+		<Column name="OverallPercentComplete" datatype="Float" group="Progress" formula="OverallPercentComplete"/>
+		<Column name="Predecessors" datatype="String" group="Logic" formula="Predecessors"/>
+		<Column name="Successors" datatype="String" group="Logic" formula="Successors"/>
+		<Column name="ConstraintFlag" datatype="Enumerated" group="Constraint" formula="Constraint"/>
+		<Column name="PlannedPercentComplete" datatype="Float" group="Progress" formula="PlannedPercentComplete(CB, PEP)"/>
+		<Column name="OriginalStart" datatype="Datetime" group="Date" formula="OriginalStart"/>
+		<Column name="OriginalFinish" datatype="Datetime" group="Date" formula="OriginalFinish"/>
+		<Column name="LateStart" datatype="Datetime" group="Float" formula="LateStart"/>
+		<Column name="LateFinish" datatype="Datetime" group="Float" formula="LateFinish"/>
+		<Column name="BaselineEarlyStart" datatype="Datetime" group="Date" formula="[~CB].EarlyStart"/>
+		<Column name="BaselineEarlyFinish" datatype="Datetime" group="Date" formula="[~CB].EarlyFinish"/>
+		<Column name="BaselineLateStart" datatype="Datetime" group="Date" formula="[~CB].LateStart"/>
+		<Column name="BaselineLateFinish" datatype="Datetime" group="Date" formula="[~CB].LateFinish"/>
+		<Column name="BaselineEffort" datatype="Duration" group="Resource" formula="[~CB].Effort / '1h'"/>
+		<Column name="BufferTask" datatype="Boolean" group="Constraint" formula="BufferTask"/>
+            </Columns>
+        </Table>
+    
+		<Table name="TaskCompletedSection" apptype="taskcompletedsection" comment ="Added v2-1">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID" formula="Int(ID)" required="true"/>
+		<Column name="ProjectID" datatype="Integer" group="ID" formula="Int(Project)" required="true"/>
+		<Column name="Parent" datatype="Integer" group="Identification" field="Task"/>
+		<Column name="ParentName" datatype="String" group="Identification" formula="ParentName"/>
+		<Column name="PeriodID" datatype="Integer" group="ID" field="LastProgressPeriod"/>
+		<Column name="ActStart" datatype="Datetime" group="Date" field="ActualStart"/>
+		<Column name="ActFinish" datatype="Datetime" group="Date" field="ActualEnd"/> 
+		<Column name="OPC" datatype="Float" group="value" field="OverallPercentComplete"/>
+
+            </Columns>
+		</Table>
+
+       <Table name="TaskDurationSlice" apptype="task" timephase="1ed">
+        <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID" formula="Int(ID)" required="true"/>
+		<Column name="StartDate" datatype="Datetime" group="Date" formula="Start"/>
+		<Column name="FinishDate" datatype="Datetime" group="Date" formula="Finish"/>
+		<Column name="TimephaseStart" datatype="Datetime" group="Timephase" special="Timephase Start"/>
+		<Column name="TimephaseEnd"  datatype="Datetime" group="Timephase" special="Timephase End"/>
+		<Column name="LiveDuration" datatype="Duration" group="Task Duration" formula="Task[~LP].duration" comment="Live Planned duration to date adjusted for date slice" />
+		<Column name="PlannedDuration" datatype="Duration" group="Task Duration" formula="Task[~CB].duration" comment="Baseline Planned duration to date adjusted for date slice" />
+		<Column name="ActualDuration" datatype="Duration" group="Task Duration" formula="Task[~LP].ActualDuration" comment="Live actual duration adjusted for date slice" />
+		<Column name="PseudoEarnedDuration" datatype="Duration" group="Task Duration" formula="Try((Task[~LP].PlannedPercentComplete(LP, na)/100) *((Task.OverallPercentComplete/100)* [~CB].duration),'1d')" comment="This is an approximation. For true duration earned value use the task completed section information to place the progress in the matching periods date range."/>
+		<Column name="PPC" datatype="Float" group="Task Duration" formula="(Task[~LP].PlannedPercentComplete(LP, na)/100)"/>
+		 </Columns>
+        </Table>
+       
+	    <Table name="Task" apptype="task">
+            <Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID" formula="Int(ID)" required="true"/>
+		<Column name="ProjectID" datatype="Integer" group="ID" formula="Int(Project)" required="true"/>
+		<Column name="PathName" datatype="String" group="Identification" formula="PathName"/>
+		<Column name="ParentContainer" datatype="Integer" group="Identification" field="Etask" comment="First ascendant expanded or summary task" />
+		<Column name="Lineage" datatype="String" group="Identification" field="parents"/>
+		<Column name="Name" datatype="String" group="ID" formula="Name"/>
+		<Column name="BaselineStart" datatype="Datetime" group="Date" formula="[~CB].Start"/>
+		<Column name="BaselineFinish" datatype="Datetime" group="Date" formula="[~CB].Finish"/>
+		<Column name="PlannedPercentComplete" datatype="Float" group="Progress" formula="PlannedPercentComplete(CB, PEP)"/>
+		<Column name="OriginalStart" datatype="Datetime" group="Date" formula="OriginalStart"/>
+		<Column name="OriginalFinish" datatype="Datetime" group="Date" formula="OriginalFinish"/>
+		<Column name="Notes" datatype="String" group="Identification" formula="Notes" size="2000"/>
+		<Column name="Type" datatype="Enumerated" group="Identification" formula="Text(Type)" size="20"/>
+		<Column name="TaskOID" datatype="Integer" group="Identification" formula="TaskID"/>
+		<Column name="BarID" datatype="Integer" group="Identification" formula="BarID"/>
+		<Column name="BarNaturalOrder" datatype="Integer" group="Identification" formula="Bar.NaturalOrder"/>
+		<Column name="NaturalOrder" datatype="Integer" group="Identification" formula="NaturalOrder"/>
+		<Column name="UniqueTaskID" datatype="String" group="Identification" formula="UniqueTaskID" size="40"/>
+		<Column name="Critical" datatype="Boolean" group="Float" formula="Critical"/>
+		<Column name="EarlyStart" datatype="Datetime" group="Float" formula="EarlyStart"/>
+		<Column name="EarlyFinish" datatype="Datetime" group="Float" formula="EarlyFinish"/>
+		<Column name="LateStart" datatype="Datetime" group="Float" formula="LateStart"/>
+		<Column name="LateFinish" datatype="Datetime" group="Float" formula="LateFinish"/>
+		<Column name="TotalFloat" datatype="Duration" group="Float" formula="TotalFloat / '1h'"/>
+		<Column name="OriginalDuration" datatype="Duration" group="Float" formula="OriginalDuration / '1h'"/>
+		<Column name="LongestPath" datatype="Boolean" group="Float" formula="LongestPath"/>
+		<Column name="NearlyCritical" datatype="Boolean" group="Float" formula="NearlyCritical"/>
+		<Column name="StartDate" datatype="Datetime" group="Date" formula="Start"/>
+		<Column name="Finish" datatype="Datetime" group="Date" formula="Finish"/>
+		<Column name="DurationHours" datatype="Duration" group="Date" formula="Duration / '1h'"/>
+		<Column name="DurationDays" datatype="Duration" group="Date" formula="Duration / '1d'"/>
+		<Column name="CalendarId" datatype="Integer" group="Date" formula="Int(Calendar)"/>
+		<Column name="Calendar" datatype="String" group="Date" formula="Text(Calendar)"/>
+		<Column name="DurationPercentComplete" datatype="Float" group="Progress" formula="DurationPercentComplete"/>
+		<Column name="ActualStart" datatype="Datetime" group="Date" formula="ActualStart"/>
+		<Column name="ActualFinish" datatype="Datetime" group="Date" formula="ActualFinish"/>
+		<Column name="PercentComplete" datatype="Float" group="Progress" formula="PercentComplete"/>
+		<Column name="OverallPercentComplete" datatype="Float" group="Progress" formula="OverallPercentComplete"/>
+		<Column name="Predecessors" datatype="String" group="Logic" formula="Predecessors"/>
+		<Column name="Successors" datatype="String" group="Logic" formula="Successors"/>
+		<Column name="ConstraintFlag" datatype="Enumerated" group="Constraint" formula="Constraint"/>
+		<Column name="BaselineEarlyStart" datatype="Datetime" group="Date" formula="[~CB].EarlyStart"/>
+		<Column name="BaselineEarlyFinish" datatype="Datetime" group="Date" formula="[~CB].EarlyFinish"/>
+		<Column name="BaselineLateStart" datatype="Datetime" group="Date" formula="[~CB].LateStart"/>
+		<Column name="BaselineLateFinish" datatype="Datetime" group="Date" formula="[~CB].LateFinish"/>
+		<Column name="BaselineEffort" datatype="Duration" group="Resource" formula="[~CB].Effort / '1h'"/>
+		<Column name="BufferTask" datatype="Boolean" group="Constraint" formula="BufferTask"/>
+            </Columns>
+        </Table>
+
+	  <!-- All codes for all objects as comma delimited lists. Requries a view to convert to single entry per row -->
+	<Table name="AllAssignedCodes" apptype="CodeLibraryAssignableObject" appfilter="Codes[] > 0">
+		<Columns>
+		<Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+		<Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+		<Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+		<Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<Column name="ID" datatype="Integer" group="ID" field="ID" required="true"/>
+		<Column name="Allcodes" datatype="String" group="codes" field="Codes" size="4000" />
+		<Column name="ObjectType" datatype="String" group="ID" field="ObjectType" />
+            </Columns>
+        </Table>
+
+	<Table name="Bsln" apptype="BaselineSummary" >
+            <Columns>
+                <Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+                <Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+                <Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+                <Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+		<!--<Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>  -1 indicates the live programme. To get a different value you need to open and export the baseline -->
+                <Column name="BaselineIDNumber" datatype="Integer" group="Location" field="baselineid" required="true"/>
+                <Column name="ObjectID" datatype="Integer" group="ID"  field="ID"  required="true"/>
+                <Column name="Name" datatype="String" group="ID" field="Name"/>
+                <Column name="PathName" datatype="String" group="ID" field="Pathname"/>
+                <Column name="BaselineProjectId" datatype="Integer" group="ID" field="BaselineProjectId"/>
+                <Column name="Active" datatype="Boolean" group="ID" field="Active"/>
+		<Column name="CreationDate" datatype="Datetime" group="ID" field="CreationDate"/>
+		<Column name="LastEditedDate" datatype="Datetime" group="ID" field="LastEditedDate"/>
+            </Columns>
+        </Table>
+
+        <Table name="Link" apptype="link">
+            <Columns>
+                <Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+                <Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+                <Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+                <Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+                <Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+                <Column name="ID" datatype="Integer" group="ID" formula="Int(ID)" required="true"/>
+                <Column name="ShortName" datatype="String" group="Location" psfield="shortname"/>
+                <Column name="LongName" datatype="String" group="Location" psfield="longname"/>
+                <Column name="ShortFileName" datatype="String" group="Location" psfield="shortfilename"/>
+                <Column name="LongFileName" datatype="String" group="Location" psfield="longfilename"/>
+                <Column name="StartID" datatype="Integer" group="Tasks" field="starttask"/>
+                <Column name="StartFullName" datatype="String" group="Tasks" field="startfullname"/>
+                <Column name="StartUTID" datatype="String" group="Tasks" field="startutid" size="40"/>
+                <Column name="EndID" datatype="Integer" group="Tasks" field="endtask"/>
+                <Column name="EndFullName" datatype="String" group="Tasks" field="endfullname"/>
+                <Column name="EndUTID" datatype="String" group="Tasks" field="endutid" size="40"/>
+                <Column name="Type" datatype="Enumerated" group="Links" size="20" field="type"/>
+                <Column name="Category" datatype="String" group="Links" size="20" field="linkcategory"/>
+                <Column name="Slope" datatype="Duration" group="Links" field="slope"/>
+                <Column name="TotalLeadLag" datatype="Duration" group="Links" field="leadlag"/>
+                <Column name="StartLeadLag" datatype="Duration" group="Links" field="startlagdisplaytime"/>
+                <Column name="EndLeadLag" datatype="Duration" group="Links" field="endlagdisplaytime"/>
+                <Column name="Comments" datatype="String" group="Links" size="500" field="comments"/>
+                <Column name="Unschedulable" datatype="Boolean" group="Links" field="unschedulable"/>
+                <Column name="Driving" datatype="Boolean" group="Links" field="driving"/>
+                <Column name="Complete" datatype="Boolean" group="Links" field="complete"/>
+                <Column name="Critical" datatype="Boolean" group="Links" field="critical"/>
+                <Column name="OnLoop" datatype="Boolean" group="Links" field="onloop"/>
+                <Column name="LongestPath" datatype="Boolean" group="Links" field="longestpath"/>
+            </Columns>
+        </Table>
+
+        <Table name="AllocationTimephased" apptype="costorresallocation" timephase="1ed">
+            <Columns>
+                <Column name="RunDate" datatype="Datetime" group="Location" special="Run date"/>
+                <Column name="RunNumber" datatype="Integer" group="Location" special="Run number"/>
+                <Column name="PlanningDataID" datatype="GUID" group="Location" psfield="projectguid" required="true"/>
+                <Column name="PlanningDataVersion" datatype="Integer" group="Location" psfield="projectversion" required="true"/>
+                <Column name="BaselineID" datatype="Integer" group="Location" psfield="baselineid" required="true"/>
+                <Column name="TimephaseStart" datatype="Datetime" group="Timephase" special="Timephase Start"/>
+                <Column name="TimephaseEnd"  datatype="Datetime" group="Timephase" special="Timephase End"/>
+                <Column name="ID" datatype="Integer" group="ID" formula="Int(ID)" required="true"/>
+                <Column name="ResourceName" datatype="String" group="ID" formula="Name"/>
+                <Column name="ResourceFullName" datatype="String" group="ID" formula="Pathname &amp; &quot;\&quot; &amp; Name"/>
+                <Column name="UniqueTaskID" datatype="String" group="Identification" formula="Task.UniqueTaskID" size="40"/>
+		<Column name="ActivityID" datatype="Integer" group="Identification" formula="Task.Id" required="true"/>
+		<Column name="Baseline Effort" datatype="Duration" group="Resource" formula=" [~CB]. Effort / '1h'"/>
+                <Column name="Effort" datatype="Duration" group="Resource" formula="Effort / '1h'"/>
+                <Column name="ActualEffort" datatype="Duration" group="Resource" formula="ActualEffort / '1h'"/>
+            </Columns>
+        </Table>
+
+    </Tables>
+</Model>
